@@ -9,7 +9,8 @@ from flask_apscheduler import APScheduler
 GPIO.setmode(GPIO.BCM)
 app = Flask(__name__)
 
-        
+currentTimeStr = None
+
 class Config(object):
     JOBS = [
         {
@@ -24,13 +25,21 @@ class Config(object):
     SCHEDULER_API_ENABLED = True
 
 
+GPIO_PIN_DOOR = 17
+
 # Create a dictionary called pins to store the pin number, name, and pin state:
 pins = {
-   17 : {'name' : 'Tuere', 'state' : GPIO.LOW},
-   27 : {'name' : 'Licht L', 'state' : GPIO.LOW},
-   22 : {'name' : 'Licht R', 'state' : GPIO.LOW},
+   GPIO_PIN_DOOR : {'name' : 'Tuere', 'state' : GPIO.LOW},
+   27 : {'name' : 'Licht L', 'state' : GPIO.HIGH},
+   22 : {'name' : 'Licht R', 'state' : GPIO.HIGH},
    5 : {'name' : 'Leuchtreklame', 'state' : GPIO.LOW},
    }
+
+# Set each pin as an output and make it low:
+for pin in pins:
+   GPIO.setup(pin, GPIO.OUT)
+   GPIO.output(pin, pins[pin]['state'])
+
 
 door = {
         'state': "closed"
@@ -41,32 +50,61 @@ def todayAt (hr, min=0, sec=0, micros=0):
    return now.replace(hour=hr, minute=min, second=sec, microsecond=micros)   
 
 def time_scheduler(a, b):
-    print("{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now()))
-    if (datetime.datetime.now() > todayAt(17, 19)):
-        door["state"] = "closed"
+    print("Current Time: {:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now()))
+    
+    doorOpenTime = todayAt(6, 00)
+    doorCloseTime = todayAt(22, 00)
+
+    if ((datetime.datetime.now() > doorOpenTime) & (datetime.datetime.now() < doorCloseTime)):
+        newDoorState = "open"
+        GPIO.output(GPIO_PIN_DOOR, GPIO.LOW)
     else:
-        door["state"] = "open"
-    print ("Door %s" % door["state"])
+        newDoorState = "closed"
+        GPIO.output(GPIO_PIN_DOOR, GPIO.HIGH)
+        
+    if newDoorState != door["state"]:
+        logAction("Door %s->%s" %(door["state"], newDoorState))
+        door["state"] = newDoorState
 
 
+def logAction(msg):
+    logStr = "LOG: {:%Y-%m-%d %H:%M:%S} ".format(datetime.datetime.now()) + str(msg)
+    print(logStr)
+    with open('log.txt','a') as f:
+        f.write(logStr + "\n")
 
-# Set each pin as an output and make it low:
-for pin in pins:
-   GPIO.setup(pin, GPIO.OUT)
-   GPIO.output(pin, GPIO.LOW)
+def updateCurrentTimeString():
+    currentTimeStr = "{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now())
 
 @app.route("/")
 def main():
-   # For each pin, read the pin state and store it in the pins dictionary:
-   for pin in pins:
-      pins[pin]['state'] = GPIO.input(pin)
-   # Put the pin dictionary into the template data dictionary:
-   templateData = {
-      'pins' : pins,
-      'door' : door
-      }
-   # Pass the template data into the template main.html and return it to the user
-   return render_template('main.html', **templateData)
+    currentTimeStr = "{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now())
+    updateCurrentTimeString()
+
+    # Put the pin dictionary into the template data dictionary:
+    templateData = {
+        'door' : door,
+        'currentTimeStr' : currentTimeStr
+    }
+
+    # Pass the template data into the template main.html and return it to the user
+    return render_template('main.html', **templateData)
+
+@app.route("/<page>")
+def rootPages(page):
+    currentTimeStr = "{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now())
+    updateCurrentTimeString()
+
+    # Put the pin dictionary into the template data dictionary:
+    templateData = {
+        'door' : door,
+        'pins' : pins,
+        'currentTimeStr' : currentTimeStr
+    }
+
+    print("currentTimeStr" + currentTimeStr)
+    # Pass the template data into the template main.html and return it to the user
+    return render_template(page, **templateData)
 
 # The function below is executed when someone requests a URL with the pin number and action in it:
 @app.route("/<changePin>/<action>")
@@ -96,7 +134,7 @@ def action(changePin, action):
       'door' : door
    }
 
-   return render_template('main.html', **templateData)
+   return render_template('service.html', **templateData)
 
 if __name__ == "__main__":
 
