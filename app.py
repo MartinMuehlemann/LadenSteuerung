@@ -139,7 +139,7 @@ def time_scheduler(a, b):
     #             with open('/home/pi/illumimance.csv','a') as fIllumimace:
     #                 fIllumimace.write(logStr + "\n")
         else:
-            pass
+            context.filteredIlluminance = 0
         
         manual = False
     
