@@ -32,7 +32,8 @@
    {{ currentTimeStr }}
    
    <h2>Tuere
-   {% if door.state == open %}
+   {{door}}
+   {% if door == "open" %}
    		offen
    {% else %}
   		geschlossen
