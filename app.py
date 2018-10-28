@@ -33,6 +33,8 @@ GPIO_PIN_LIGHT2 = 22
 GPIO_PIN_SIGN = 5
 GPIO_PIN_LIGHT_ENTRY = 6
 
+WATCHDOG_TRIGGER_FILE = "/var/log/ladensteuerung_watchdog_trigger"
+
 # Create a dictionary called pins to store the pin number, name, and pin state:
 pins = {
    GPIO_PIN_DOOR : {'name' : 'Tuere', 'state' : GPIO.LOW},
@@ -208,6 +210,9 @@ def time_scheduler(a, b):
             if newLightEntryState != lightEntry["state"]:
                 logAction("LightEntry %s->%s" %(lightEntry["state"], newLightEntryState))
                 lightEntry["state"] = newLightEntryState
+                
+        with open(WATCHDOG_TRIGGER_FILE, "w") as f:
+        	f.write("{:%Y-%m-%d %H:%M:%S}".format(datetime.datetime.now()))
                 
     except Exception as e:
         logAction("EXCEPTION: " + str(e))
